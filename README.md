@@ -1,1 +1,1 @@
-# React/redux-toolkit/antDesign/IndexedDb
+# React/redux-toolkit/typescript/antDesign/IndexedDb
