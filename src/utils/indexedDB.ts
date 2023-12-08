@@ -1,8 +1,5 @@
 import { Note, Tag, PromiseDB } from "./types";
-
-const DB_NAME = "notesDB";
-const STORE_NAME = "notesStore";
-const TAGS_STORE_NAME = "tagsStore";
+import { DB_NAME, STORE_NAME, TAGS_STORE_NAME } from "./constants";
 
 export async function fetchNotesFromIndexedDB(): Promise<PromiseDB> {
   return new Promise((resolve, reject) => {
@@ -10,6 +7,18 @@ export async function fetchNotesFromIndexedDB(): Promise<PromiseDB> {
 
     request.onerror = () => {
       reject(new Error("Failed to open IndexedDB"));
+    };
+
+    request.onupgradeneeded = (event) => {
+      const db: IDBDatabase = (event.target as IDBOpenDBRequest).result;
+      db.createObjectStore(STORE_NAME, {
+        keyPath: "id",
+        autoIncrement: true,
+      });
+      db.createObjectStore(TAGS_STORE_NAME, {
+        keyPath: "id",
+        autoIncrement: true,
+      });
     };
 
     request.onsuccess = (event) => {
@@ -26,17 +35,24 @@ export async function fetchNotesFromIndexedDB(): Promise<PromiseDB> {
 
       const cursorRequest: IDBRequest<IDBCursorWithValue | null> =
         store.openCursor();
-      cursorRequest.onsuccess = (event) => {
-        const cursor: IDBCursorWithValue | null = (
-          event.target as IDBRequest<IDBCursorWithValue | null>
-        ).result;
+      const cursorPromise = new Promise((cursorRes) => {
+        cursorRequest.onsuccess = (event) => {
+          const cursor: IDBCursorWithValue | null = (
+            event.target as IDBRequest<IDBCursorWithValue | null>
+          ).result;
 
-        if (cursor) {
-          notes.push(cursor.value);
-          cursor.continue();
-        }
-        const tagCursorRequest: IDBRequest<IDBCursorWithValue | null> =
-          tagsStore.openCursor();
+          if (cursor) {
+            notes.push(cursor.value);
+            cursor.continue();
+          } else {
+            cursorRes(notes);
+          }
+        };
+      });
+
+      const tagCursorRequest: IDBRequest<IDBCursorWithValue | null> =
+        tagsStore.openCursor();
+      const tagCursorPromise = new Promise((tagCursorResolve) => {
         tagCursorRequest.onsuccess = (event) => {
           const cursor: IDBCursorWithValue | null = (
             event.target as IDBRequest<IDBCursorWithValue | null>
@@ -45,25 +61,23 @@ export async function fetchNotesFromIndexedDB(): Promise<PromiseDB> {
           if (cursor) {
             tags.push(cursor.value);
             cursor.continue();
+          } else {
+            tagCursorResolve(tags);
           }
         };
+      });
 
-        Promise.all([cursorRequest, tagCursorRequest]).then(() => {
-          resolve({ notes, tags });
+      Promise.all([cursorPromise, tagCursorPromise])
+        .then(() => {
+          const promiseDB: PromiseDB = {
+            notes,
+            tags,
+          };
+          resolve(promiseDB);
+        })
+        .catch((error) => {
+          reject(new Error("Failed to fetch notes from IndexedDB"));
         });
-      };
-
-      request.onupgradeneeded = (event) => {
-        const db: IDBDatabase = (event.target as IDBOpenDBRequest).result;
-        db.createObjectStore(STORE_NAME, {
-          keyPath: "id",
-          autoIncrement: true,
-        });
-        db.createObjectStore(TAGS_STORE_NAME, {
-          keyPath: "id",
-          autoIncrement: true,
-        });
-      };
     };
   });
 }

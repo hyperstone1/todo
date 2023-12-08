@@ -1,17 +1,17 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import { PromiseDB } from "../../utils/types";
-import { openDB } from "idb";
+// import { openDB } from "idb";
+// import { DB_NAME, TAGS_STORE_NAME, STORE_NAME } from "../../utils/constants";
+import { fetchNotesFromIndexedDB } from "../../utils/indexedDB";
 
 export const fetchNotes = createAsyncThunk<PromiseDB, void>(
   "notes/fetchNotes",
   async () => {
-    const db = await openDB("notesDB", 1);
-    const transaction = db.transaction(["notesStore", "tagsStore"], "readonly");
-    const store = transaction.objectStore("notesStore");
-    const tagsStore = transaction.objectStore("tagsStore");
-    const notes = await store.getAll();
-    const tags = await tagsStore.getAll();
-    return { notes, tags };
+    try {
+      const { notes, tags } = await fetchNotesFromIndexedDB();
+      return { notes, tags };
+    } catch (error) {
+      throw new Error("Failed to fetch notes.");
+    }
   }
 );
-// Другие асинхронные операции с заметками, такие как создание и удаление, могут быть добавлены здесь.

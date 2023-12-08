@@ -120,6 +120,7 @@ const notesSlice = createSlice({
       })
       .addCase(fetchNotes.fulfilled, (state, action) => {
         state.loading = false;
+        console.log(action.payload.notes);
         state.notes = action.payload.notes;
         state.tags = action.payload.tags;
       })
